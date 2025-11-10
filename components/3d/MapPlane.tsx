@@ -33,7 +33,7 @@ export default function MapPlane({
   };
 
   const cardColor = useMemo(
-    () => getCssVariable("--colors-card", "#565656"),
+    () => getCssVariable("--color-muted-foreground", "#a3a3a3"),
     []
   );
 

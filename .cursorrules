@@ -1,0 +1,41 @@
+# Cursor Collaboration Rules – Trazzos Clusters Galaxy
+
+## Project Conventions
+
+- Use **TypeScript** (`.ts`/`.tsx`) with strict typing; prefer branded types from `types/models.ts`.
+- Favor **named exports**; avoid default exports unless the existing file already uses one.
+- Import modules using the project alias `@/` rather than relative paths.
+- Keep files ASCII unless there is a strong reason and the file already contains Unicode.
+- When adding new visual elements, reuse palettes from `lib/utils/colors.ts` and meshes from `lib/utils/geometry.ts`.
+- Clamp any 3D positions through the helpers in `lib/data/process-data.ts` (`clampToSurface`, `clampPointToPlane`) to prevent rendering artifacts.
+
+## Tooling & Commands
+
+- Install dependencies with `npm install`.
+- Common scripts:
+  - `npm run dev` – start the Next.js dev server.
+  - `npm run build` – production build with type checking.
+  - `npm run lint` – run ESLint (use before opening PRs).
+- Prefer the provided tools (e.g., `read_file`, `apply_patch`) over shell equivalents. When you must run commands, `cd /home/fitosegrera/null/commercial/trazzos/code/trazzos-clusters-galaxy` first.
+
+## Workflow Expectations
+
+- Before large changes, review relevant docs in `docs/` (especially `architecture-diagram.md`, `quick-start-guide.md`) and existing data files in `data/`.
+- Treat datasets in `data/sample*.ts` as source of truth; enrich them via `lib/data/process-data.ts` instead of in-place edits unless explicitly requested.
+- Update or extend Zustand stores (`lib/store/*`) via pure functions—don’t mutate state directly.
+- For visualization tweaks, propagate state through existing hooks/components (`components/3d/**`) rather than bypassing the store.
+- Any personalization or auth changes must flow through `useAuthStore` and `personalizeForCompany`.
+- Keep documentation synchronized: update `AGENTS.md` and related docs if you introduce new automated behaviors or guidelines.
+
+## Pull Request Hygiene
+
+- Provide concise summaries focusing on user-facing impact and agent responsibilities.
+- Reference testing commands executed (e.g., `npm run lint`).
+- Attach new or updated docs whenever behavior changes.
+
+## Safety Nets
+
+- If a dataset row is removed or renamed, ensure dependent agents/components degrade gracefully (baseline connections, InfoPanel fallbacks).
+- Maintain the audit trail: when modifying business outcomes (savings, KPIs, committee decisions), reflect them both in datasets and presentation layers.
+
+Follow these guidelines to keep collaboration predictable and the 3D galaxy coherent.

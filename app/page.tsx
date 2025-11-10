@@ -24,10 +24,6 @@ export default function Home() {
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-4 left-4 z-999 flex flex-col gap-3 pointer-events-auto">
           <AuthScopeBadge />
-          {/* <div className="bg-[#131313]/90 backdrop-blur-sm rounded-lg p-4 space-y-4 min-w-[220px]">
-            <Header />
-            <ControlPanel />
-          </div> */}
           <DebugPanel />
         </div>
         <InfoPanel />

@@ -2,7 +2,7 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as THREE from "three";
-import { Html, RoundedBox } from "@react-three/drei";
+import { Html } from "@react-three/drei";
 import { animated, useSpring } from "@react-spring/three";
 import { useFrame, useThree } from "@react-three/fiber";
 import {
@@ -43,19 +43,55 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
 
   const nodeColor = NODE_COLORS.company;
   const isSelected = selectedNode === company.nodeId;
+  const isFocus = company.isFocus ?? false;
+  const focusSegments = Math.max(company.focusSegments ?? 8, 3);
+
   const geometry = useMemo(() => GEOMETRIES.company, []);
-  const baseDimensions = useMemo(
-    () => ({
-      width: geometry.parameters.width,
-      height: geometry.parameters.height,
-      depth: geometry.parameters.depth,
-    }),
-    [
-      geometry.parameters.depth,
-      geometry.parameters.height,
-      geometry.parameters.width,
-    ]
-  );
+  const baseDimensions = useMemo(() => {
+    if (isFocus) {
+      const radius = 4.2;
+      const height = 1.2;
+      const segments = Math.max(focusSegments, 6);
+      return {
+        width: radius * 2,
+        height,
+        depth: radius * 2,
+        radius,
+        segments,
+        geometry: new THREE.CylinderGeometry(
+          radius,
+          radius,
+          height,
+          segments,
+          1,
+          false
+        ),
+      };
+    }
+    const radius = geometry.parameters.width / 2;
+    const height = geometry.parameters.height;
+    const segments = 16;
+    return {
+      width: radius * 2,
+      height,
+      depth: radius * 2,
+      radius,
+      segments,
+      geometry: new THREE.CylinderGeometry(
+        radius,
+        radius,
+        height,
+        segments,
+        1,
+        false
+      ),
+    };
+  }, [
+    focusSegments,
+    geometry.parameters.height,
+    geometry.parameters.width,
+    isFocus,
+  ]);
 
   const relatedSynergies = useMemo(
     () =>
@@ -126,36 +162,25 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
 
     ctx.clearRect(0, 0, size, size);
 
-    const padding = size * 0.13;
-    const radius = size * 10;
-
-    const innerWidth = size - padding * 2;
-    const innerHeight = size - padding * 2;
-    const x = padding;
-    const y = padding;
-
-    ctx.fillStyle = "#e8faeb";
-    ctx.beginPath();
-    ctx.moveTo(x + radius, y);
-    ctx.lineTo(x + innerWidth - radius, y);
-    ctx.quadraticCurveTo(x + innerWidth, y, x + innerWidth, y + radius);
-    ctx.lineTo(x + innerWidth, y + innerHeight - radius);
-    ctx.quadraticCurveTo(
-      x + innerWidth,
-      y + innerHeight,
-      x + innerWidth - radius,
-      y + innerHeight
-    );
-    ctx.lineTo(x + radius, y + innerHeight);
-    ctx.quadraticCurveTo(x, y + innerHeight, x, y + innerHeight - radius);
-    ctx.lineTo(x, y + radius);
-    ctx.quadraticCurveTo(x, y, x + radius, y);
-    ctx.closePath();
-    ctx.fill();
+    const center = size / 2;
 
     const trimmed = company.empresa.trim();
     const primaryLetter = trimmed.charAt(0).toUpperCase();
     const secondaryLetter = trimmed.charAt(1)?.toLowerCase() ?? "";
+
+    ctx.fillStyle = "#f8fcf1";
+    ctx.globalAlpha = 0.95;
+    ctx.beginPath();
+    ctx.arc(center, center, size, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.lineWidth = size * 0.01;
+    ctx.beginPath();
+    ctx.arc(center, center, size * 0.39, 0, Math.PI * 2);
+    ctx.closePath();
+    ctx.stroke();
 
     ctx.fillStyle = NODE_COLORS.company;
     ctx.textAlign = "center";
@@ -228,6 +253,12 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
       plasmaMaterials.forEach((mat) => mat.dispose());
     };
   }, [plasmaMaterials]);
+
+  useEffect(() => {
+    return () => {
+      baseDimensions.geometry.dispose();
+    };
+  }, [baseDimensions.geometry]);
 
   useFrame((state, delta) => {
     const apertureValue = aperture.get();
@@ -317,33 +348,32 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
         setConnectionMode("focus");
       }}
     >
-      <RoundedBox
-        args={[
-          baseDimensions.width,
-          baseDimensions.height,
-          baseDimensions.depth,
-        ]}
-        radius={0.18}
-        smoothness={4}
-        castShadow
-        receiveShadow
-      >
+      <mesh geometry={baseDimensions.geometry} castShadow receiveShadow>
         <meshStandardMaterial
           color={nodeColor}
           emissive={hovered || isSelected ? nodeColor : "#000000"}
-          emissiveIntensity={hovered || isSelected ? 0.7 : 0.15}
-          metalness={0.3}
-          roughness={0.5}
+          emissiveIntensity={hovered || isSelected ? 0.75 : 0.2}
+          metalness={0.32}
+          roughness={0.45}
         />
-      </RoundedBox>
+      </mesh>
 
-      <animated.mesh position={lidPosition} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry
-          args={[baseDimensions.width * 0.84, baseDimensions.depth * 0.84]}
+      <animated.mesh
+        position={lidPosition}
+        rotation={[
+          -Math.PI / 2,
+          0,
+          isFocus ? (Math.PI * 2) / (baseDimensions.segments ?? 1) / 2 : 0,
+        ]}
+      >
+        <circleGeometry
+          args={[baseDimensions.radius, baseDimensions.segments]}
         />
         <meshStandardMaterial
           map={topTexture ?? undefined}
           color="#ffffff"
+          transparent
+          opacity={topTexture ? 1 : 0}
           metalness={0.1}
           roughness={0.4}
           emissive="#000000"

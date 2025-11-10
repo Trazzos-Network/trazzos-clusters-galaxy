@@ -21,8 +21,8 @@ export const COLORS = {
  * Node colors by category
  */
 export const NODE_COLORS = {
-  company: COLORS.dataviz[2], // #74b600
-  provider: COLORS.dataviz[2], // #a8d564
+  company: COLORS.dataviz[1],
+  provider: COLORS.dataviz[2],
   synergy: COLORS.dataviz[0], // #9aff8d
   rfp: COLORS.dataviz[4], // #f9d134
   offer: COLORS.dataviz[3], // #c4e8a0
@@ -33,7 +33,7 @@ export const NODE_COLORS = {
  * Connection colors by type
  */
 export const CONNECTION_COLORS = {
-  mutedSynergy: "#263624", // #74b600
+  mutedSynergy: "#333333", // #74b600
   synergy: COLORS.primary, // #cbffc4
   supply: COLORS.dataviz[2], // #a8d564
   need: COLORS.dataviz[4], // #f9d134

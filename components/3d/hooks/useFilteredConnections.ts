@@ -22,7 +22,8 @@ export function useFilteredConnections() {
   const baseConnections = useMemo(
     () =>
       (useOrdered ? orderedConnections : naturalConnections).filter(
-        (connection) => connection.type === "synergy"
+        (connection) =>
+          connection.type === "synergy" || connection.type === "baseline"
       ),
     [naturalConnections, orderedConnections, useOrdered]
   );

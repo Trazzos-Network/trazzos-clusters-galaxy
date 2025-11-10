@@ -39,11 +39,15 @@ const CLUSTER_LAYOUTS: Record<string, [number, number][]> = {
   ],
 };
 
+const FOCUS_NODE_RADIUS = 4.2;
+
 export type ConnectionViewMode = "all" | "key" | "focus";
 
 export interface ClusterCompany extends EnrichedCompany {
   clusterId: string;
   nodeId: NodeRef;
+  isFocus?: boolean;
+  focusSegments?: number;
 }
 
 export interface ClusterConnection extends Connection {
@@ -215,6 +219,66 @@ function generateNaturalConnections(
     }
     return combos;
   });
+}
+
+function generateBaselineConnections(
+  clusterId: string,
+  focusEmpresa: Empresa,
+  companies: ClusterCompany[],
+  existingConnections: ClusterConnection[]
+): ClusterConnection[] {
+  const focusCompany = companies.find(
+    (company) => company.empresa === focusEmpresa
+  );
+  if (!focusCompany) return [];
+
+  const alreadyConnected = new Set<Empresa>();
+  existingConnections.forEach((connection) => {
+    if (
+      connection.from.empresa === focusEmpresa &&
+      connection.to.empresa !== focusEmpresa
+    ) {
+      alreadyConnected.add(connection.to.empresa);
+    }
+    if (
+      connection.to.empresa === focusEmpresa &&
+      connection.from.empresa !== focusEmpresa
+    ) {
+      alreadyConnected.add(connection.from.empresa);
+    }
+  });
+
+  return companies
+    .filter((company) => company.empresa !== focusEmpresa)
+    .filter((company) => !alreadyConnected.has(company.empresa))
+    .map((company) => {
+      const fromPosition = [...focusCompany.position3D] as [
+        number,
+        number,
+        number
+      ];
+      const toPosition = [...company.position3D] as [number, number, number];
+      return {
+        id: `baseline-${clusterId}-${focusEmpresa}-${company.empresa}`,
+        clusterId,
+        from: {
+          empresa: focusEmpresa,
+          position: fromPosition,
+        },
+        to: {
+          empresa: company.empresa,
+          position: toPosition,
+        },
+        type: "baseline" as const,
+        strength: 0.05,
+        path: [fromPosition, toPosition],
+        data: null,
+        nodeRefs: {
+          from: createCompanyNodeId(clusterId, focusEmpresa),
+          to: createCompanyNodeId(clusterId, company.empresa),
+        },
+      };
+    });
 }
 
 function buildClusterVisualization(
@@ -435,6 +499,10 @@ function createPersonalizedCluster(
     cluster.offset[1],
   ];
 
+  const totalCompanies = cluster.enrichedCompanies.length;
+
+  const anchorMap = new Map<Empresa, [number, number, number]>();
+
   const others = cluster.enrichedCompanies
     .filter((company) => company.empresa !== focusEmpresa)
     .sort((a, b) => a.empresa.localeCompare(b.empresa));
@@ -446,6 +514,7 @@ function createPersonalizedCluster(
   const repositioned: ClusterCompany[] = cluster.enrichedCompanies.map(
     (company) => {
       if (company.empresa === focusEmpresa) {
+        anchorMap.clear();
         return {
           ...company,
           position3D: [
@@ -453,17 +522,31 @@ function createPersonalizedCluster(
             centerPosition[1],
             centerPosition[2],
           ] as [number, number, number],
+          isFocus: true,
+          focusSegments: totalCompanies,
         };
       }
 
       const index = others.findIndex((item) => item.nodeId === company.nodeId);
       if (index === -1) {
-        return { ...company };
+        return { ...company, isFocus: false };
       }
 
       const angle = angleStep * index;
       const targetX = centerPosition[0] + Math.cos(angle) * radius;
       const targetZ = centerPosition[2] + Math.sin(angle) * radius;
+      const dirX = targetX - centerPosition[0];
+      const dirZ = targetZ - centerPosition[2];
+      const magnitude = Math.sqrt(dirX * dirX + dirZ * dirZ) || 1;
+      const unitX = dirX / magnitude;
+      const unitZ = dirZ / magnitude;
+      const anchorX = centerPosition[0] + unitX * FOCUS_NODE_RADIUS;
+      const anchorZ = centerPosition[2] + unitZ * FOCUS_NODE_RADIUS;
+      anchorMap.set(company.empresa, [
+        clampToPlaneWithOffset(anchorX, cluster.offset[0]),
+        centerPosition[1],
+        clampToPlaneWithOffset(anchorZ, cluster.offset[1]),
+      ]);
       const nextPosition: [number, number, number] = [
         clampToPlaneWithOffset(targetX, cluster.offset[0]),
         company.position3D[1],
@@ -473,31 +556,91 @@ function createPersonalizedCluster(
       return {
         ...company,
         position3D: nextPosition,
+        isFocus: false,
       };
     }
   );
+
+  const anchorConnection = (
+    connection: ClusterConnection
+  ): ClusterConnection => {
+    const fromIsFocus = connection.from.empresa === focusEmpresa;
+    const toIsFocus = connection.to.empresa === focusEmpresa;
+    const fromAnchor =
+      fromIsFocus && anchorMap.get(connection.to.empresa as Empresa);
+    const toAnchor =
+      toIsFocus && anchorMap.get(connection.from.empresa as Empresa);
+
+    const adjustedPath = connection.path.map((point, index, array) => {
+      if (index === 0 && fromAnchor) {
+        return [fromAnchor[0], connection.from.position[1], fromAnchor[2]] as [
+          number,
+          number,
+          number
+        ];
+      }
+      if (index === array.length - 1 && toAnchor) {
+        return [toAnchor[0], connection.to.position[1], toAnchor[2]] as [
+          number,
+          number,
+          number
+        ];
+      }
+      return point;
+    });
+
+    return {
+      ...connection,
+      from: {
+        ...connection.from,
+        position:
+          fromAnchor && fromIsFocus
+            ? [fromAnchor[0], connection.from.position[1], fromAnchor[2]]
+            : connection.from.position,
+      },
+      to: {
+        ...connection.to,
+        position:
+          toAnchor && toIsFocus
+            ? [toAnchor[0], connection.to.position[1], toAnchor[2]]
+            : connection.to.position,
+      },
+      path: adjustedPath,
+    };
+  };
 
   const orderedConnections = generateOrderedConnections(
     cluster.id,
     cluster.sinergias,
     repositioned,
     cluster.offset
-  ).filter(
-    (connection) =>
-      connection.from.empresa === focusEmpresa ||
-      connection.to.empresa === focusEmpresa
-  );
+  )
+    .filter(
+      (connection) =>
+        connection.from.empresa === focusEmpresa ||
+        connection.to.empresa === focusEmpresa
+    )
+    .map(anchorConnection);
+
+  const baselineConnections = generateBaselineConnections(
+    cluster.id,
+    focusEmpresa,
+    repositioned,
+    orderedConnections
+  ).map(anchorConnection);
 
   const naturalConnections = generateNaturalConnections(
     cluster.id,
     cluster.sinergias,
     repositioned,
     cluster.offset
-  ).filter(
-    (connection) =>
-      connection.from.empresa === focusEmpresa ||
-      connection.to.empresa === focusEmpresa
-  );
+  )
+    .filter(
+      (connection) =>
+        connection.from.empresa === focusEmpresa ||
+        connection.to.empresa === focusEmpresa
+    )
+    .map(anchorConnection);
 
   const synergyPositions = computeSynergyPositionsForCluster(
     cluster.sinergias,
@@ -519,8 +662,8 @@ function createPersonalizedCluster(
   return {
     ...cluster,
     enrichedCompanies: repositioned,
-    connections: orderedConnections,
-    naturalConnections,
+    connections: [...orderedConnections, ...baselineConnections],
+    naturalConnections: [...naturalConnections, ...baselineConnections],
     synergyPositions: synergyPositionsWithIds,
   };
 }
@@ -686,9 +829,7 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
         empresa
       );
 
-      const updatedClusters = [personalizedCluster];
-
-      const aggregated = aggregateClusters(updatedClusters);
+      const aggregated = aggregateClusters([personalizedCluster]);
 
       const companyNodeId = createCompanyNodeId(
         personalizedCluster.id,
@@ -696,7 +837,7 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
       );
 
       return {
-        clusters: updatedClusters,
+        clusters: [personalizedCluster],
         clusterIndex: aggregated.clusterIndex,
         nodeIndex: aggregated.nodeIndex,
         enrichedCompanies: aggregated.enrichedCompanies,

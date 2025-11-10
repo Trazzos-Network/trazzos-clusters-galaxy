@@ -20,7 +20,7 @@ import MapPlane, {
 import Nodes from "./Nodes";
 import ClusterLabels from "./overlays/ClusterLabels";
 
-const FOCUS_DISTANCE = 18;
+const FOCUS_DISTANCE = 24;
 const ACCEL_FOCUS = 0.0055;
 const DAMPING_FOCUS = 0.97;
 const LOOK_ACCEL = 0.028;
@@ -170,31 +170,14 @@ function CameraController({
     const parsed = parseNodeRef(effectiveSelection);
     const distanceFactor = parsed?.type === "synergy" ? 0.45 : 1;
 
-    const horizontalDirection = targetPosition
-      .clone()
-      .sub(defaultLookTarget)
-      .setY(0);
-    if (horizontalDirection.lengthSq() < 1e-3) {
-      horizontalDirection.set(1, 0, 0);
-    } else {
-      horizontalDirection.normalize();
-    }
+    const offsetDirection = new THREE.Vector3(-0.82, 0, 0.82).normalize();
+    const upward = new THREE.Vector3(0, 1, 0);
 
-    const perpendicular = new THREE.Vector3(
-      -horizontalDirection.z,
-      0,
-      horizontalDirection.x
-    );
-
+    const distance = FOCUS_DISTANCE * distanceFactor;
     const desiredPosition = targetPosition
       .clone()
-      .add(
-        horizontalDirection
-          .clone()
-          .multiplyScalar(-FOCUS_DISTANCE * 0.55 * distanceFactor)
-      )
-      .add(perpendicular.multiplyScalar(FOCUS_DISTANCE * 0.35))
-      .add(new THREE.Vector3(0, FOCUS_DISTANCE * 0.85 * distanceFactor, 0));
+      .add(offsetDirection.clone().multiplyScalar(distance * 1.1))
+      .add(upward.clone().multiplyScalar(distance * 1.05));
 
     const positionDiff = desiredPosition.clone().sub(camera.position);
     cameraVelocity.current.addScaledVector(positionDiff, ACCEL_FOCUS);

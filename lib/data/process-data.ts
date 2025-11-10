@@ -256,7 +256,7 @@ export interface Connection {
   id: string;
   from: { empresa: Empresa; position: [number, number, number] };
   to: { empresa: Empresa; position: [number, number, number] };
-  type: "synergy" | "supply" | "need" | "rfp";
+  type: "synergy" | "supply" | "need" | "rfp" | "baseline";
   strength: number; // 0-1
   path: [number, number, number][];
   data?: unknown;
