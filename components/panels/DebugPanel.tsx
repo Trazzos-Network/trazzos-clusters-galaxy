@@ -1,0 +1,156 @@
+"use client";
+
+import { useState } from "react";
+
+import {
+  useVisualizationStore,
+  type VisualizationState,
+} from "@/lib/store/visualization-store";
+
+const DEBUG_OPTIONS: Array<{
+  key: keyof VisualizationState["debug"];
+  label: string;
+  description: string;
+}> = [
+  {
+    key: "showAxes",
+    label: "Mostrar ejes",
+    description: "Renderiza AxesHelper para referencia X/Y/Z.",
+  },
+  {
+    key: "showGrid",
+    label: "Mostrar cuadrícula",
+    description: "Activa una rejilla sobre el plano base.",
+  },
+  {
+    key: "showLabels",
+    label: "Etiquetas de compañías",
+    description: "Muestra todos los nombres siempre visibles.",
+  },
+  {
+    key: "useOrbitControls",
+    label: "Órbita libre",
+    description: "Habilita navegación con OrbitControls.",
+  },
+  {
+    key: "useOrderedConnections",
+    label: "Trazado ordenado",
+    description:
+      "Alterna entre rutas ortogonales optimizadas y líneas naturales directas.",
+  },
+];
+
+export default function DebugPanel() {
+  const [isOpen, setIsOpen] = useState(false);
+  const debug = useVisualizationStore((state) => state.debug);
+  const setDebugOption = useVisualizationStore((state) => state.setDebugOption);
+  const regenerateConnections = useVisualizationStore(
+    (state) => state.regenerateConnections
+  );
+
+  const connectionMode = useVisualizationStore((state) => state.connectionMode);
+  const setConnectionMode = useVisualizationStore(
+    (state) => state.setConnectionMode
+  );
+
+  return (
+    <div className="z-100 w-72 overflow-hidden rounded-lg border border-white/10 bg-[#0f0f0f]/90 shadow-lg backdrop-blur">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex w-full items-center justify-between px-4 py-3 text-left"
+      >
+        <div>
+          <p className="text-[10px] uppercase tracking-[0.3em] text-white/50">
+            Debug
+          </p>
+          <p className="text-sm font-semibold text-white">
+            Herramientas de escena
+          </p>
+        </div>
+        <span
+          className={`inline-flex h-5 w-5 items-center justify-center rounded-full border border-white/20 text-[10px] text-white transition-transform ${
+            isOpen ? "rotate-0" : "-rotate-90"
+          }`}
+        >
+          ⌃
+        </span>
+      </button>
+
+      <div
+        className={`space-y-3 border-t border-white/10 px-3 pb-4 transition-[max-height,opacity] duration-300 ease-in-out ${
+          isOpen ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
+        }`}
+      >
+        <div className="space-y-2 rounded-md border border-white/10 p-2">
+          <div className="flex flex-col gap-2 text-sm text-white">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name="connectionMode"
+                value="key"
+                checked={connectionMode === "key"}
+                onChange={() => setConnectionMode("key")}
+                className="accent-[#9aff8d]"
+              />
+              <span>Sinergias clave</span>
+            </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name="connectionMode"
+                value="focus"
+                checked={connectionMode === "focus"}
+                onChange={() => setConnectionMode("focus")}
+                className="accent-[#9aff8d]"
+              />
+              <span>Entidad seleccionada</span>
+            </label>
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input
+                type="radio"
+                name="connectionMode"
+                value="all"
+                checked={connectionMode === "all"}
+                onChange={() => setConnectionMode("all")}
+                className="accent-[#9aff8d]"
+              />
+              <span>Mostrar todas</span>
+            </label>
+          </div>
+        </div>
+
+        <ul className="space-y-3 text-xs text-white/70">
+          {DEBUG_OPTIONS.map(({ key, label, description }) => (
+            <li key={key} className="flex items-start gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setDebugOption(key, !debug[key]);
+                  if (key === "useOrderedConnections") {
+                    regenerateConnections();
+                  }
+                }}
+                className={`mt-0.5 inline-flex h-5 w-9 shrink-0 rounded-full border transition ${
+                  debug[key]
+                    ? "border-primary bg-primary/80"
+                    : "border-white/20 bg-white/5"
+                }`}
+              >
+                <span
+                  className={`block h-4 w-4 rounded-full bg-white transition-transform ${
+                    debug[key] ? "translate-x-4" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+              <div>
+                <p className="font-medium text-white">{label}</p>
+                <p className="text-white/50">{description}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,211 @@
+{
+  "clusters": [
+    {
+      "nombre": "Cluster Petroquímico de Cartagena",
+      "region": "Cartagena y Bolívar",
+      "sector": "Petroquímica y Plásticos",
+      "secretaria_tecnica": "Cámara de Comercio de Cartagena",
+      "comite_ejecutivo": [
+        "Refinería de Cartagena (Reficar)",
+        "Ecopetrol",
+        "Esenttia (Polipropileno del Caribe)",
+        "Cabot Colombiana",
+        "Yara",
+        "Ajover",
+        "Contecar (Grupo Puerto de Cartagena)",
+        "AmSty",
+        "Andercol",
+        "Dow Química",
+        "Ingecol",
+        "Vestolit (Mexichem Resinas Colombia)",
+        "Surtigas"
+      ],
+      "otras_empresas": ["Mexichem", "Popilco", "Abocol"],
+      "datos_relevantes": {
+        "porcentaje_valor_agregado_industria": "63%",
+        "porcentaje_exportaciones_departamentales": "86%"
+      }
+    },
+    {
+      "nombre": "Cluster de Flores",
+      "region": "Sabana de Bogotá, Cundinamarca, Antioquia",
+      "sector": "Floricultura",
+      "gremio": "Asocolflores",
+      "principales_empresas": [
+        {
+          "nombre": "C.I. Sunshine Bouquet Colombia",
+          "posicion": 1
+        },
+        {
+          "nombre": "Grupo Elite",
+          "posicion": 2,
+          "empresas_grupo": [
+            "The Elite Flower C.I.",
+            "Fantasy Flowers",
+            "Wayuu Flowers",
+            "C.I. Cultivos Miramonte",
+            "Excellence Flowers"
+          ]
+        },
+        {
+          "nombre": "Grupo Jardines Andes",
+          "posicion": 3,
+          "empresas_grupo": [
+            "C.I. Amancay",
+            "Jardines de los Andes",
+            "Calafate",
+            "Bicco Farms",
+            "Valmar Productora"
+          ]
+        },
+        {
+          "nombre": "Flores Ipanema",
+          "posicion": 4
+        },
+        {
+          "nombre": "Grupo Falcon Farms",
+          "posicion": 5,
+          "empresas_grupo": [
+            "Flores Isabelita",
+            "Falcon Farms de Colombia",
+            "Luisa Farms",
+            "Flores La Virginia"
+          ]
+        },
+        {
+          "nombre": "Agroindustria del Riofrío",
+          "posicion": 6
+        },
+        {
+          "nombre": "Follajes de Campo Alegre",
+          "posicion": 6
+        },
+        {
+          "nombre": "Grupo Flores de Funza",
+          "posicion": 7,
+          "empresas_grupo": [
+            "C.I. Flores de Funza",
+            "C.I. Flexport de Colombia",
+            "C.I. Agrícola Cardenal",
+            "Flores del Río & Cía",
+            "Bouquets Mixtos C.I."
+          ]
+        },
+        {
+          "nombre": "Flores El Capiro",
+          "posicion": 8
+        },
+        {
+          "nombre": "MG Consultores",
+          "posicion": 9
+        },
+        {
+          "nombre": "Flores del Hato",
+          "posicion": 9
+        },
+        {
+          "nombre": "Multiflora C.I.",
+          "posicion": 10
+        }
+      ],
+      "otras_empresas_destacadas": [
+        "Flores El Trigal",
+        "GR Chía",
+        "Hosa",
+        "Colibrí Flowers",
+        "Florval",
+        "Alexandra Farms",
+        "La Gaitana Farms",
+        "Flores Silvestres",
+        "Grupo Flores Colón",
+        "Ayurá",
+        "C.I. Maxiflores",
+        "Cultivos Casablanca",
+        "Vistaflor Corporation C.I.",
+        "Flores Las Acacias",
+        "Flores San Juan"
+      ],
+      "total_empresas": "150+"
+    },
+    {
+      "nombre": "Cluster Proteínas Blancas",
+      "region": "Valle del Cauca y Cauca",
+      "sector": "Avicultura y Porcicultura",
+      "coordinador": "Cámara de Comercio de Cali",
+      "total_empresas": 259,
+      "segmentos": [
+        "Industria del Huevo",
+        "Levante",
+        "Faenado y Frigorífico",
+        "Industria Auxiliar",
+        "Procesados",
+        "Incubadora",
+        "Distribución",
+        "Insumos",
+        "Procesadores Integrados"
+      ],
+      "empresas_mencionadas": ["Industria de Alimentos Cárbel S.A."],
+      "descripcion": "Agrupa empresas relacionadas con la producción de huevo, carne de pollo, cerdo y sus derivados, junto con industria auxiliar y distribuidores"
+    },
+    {
+      "nombre": "Cluster Cafetero",
+      "region": "Nacional (Eje Cafetero, Huila, Norte de Santander, Cesar, etc.)",
+      "sector": "Café",
+      "gremio_principal": "Federación Nacional de Cafeteros de Colombia (FNC)",
+      "clusters_regionales": [
+        {
+          "region": "Huila",
+          "total_empresas": 30,
+          "empresas": [
+            "Exportadoras de Café de Colombia S.A.",
+            "Outspan Colombia S.A.S.",
+            "C.I. Racafé & Cía. S.C.A.",
+            "Cadefihuila Ltda.",
+            "Banexport S.A.",
+            "Exportadores de Café S.A.",
+            "Ixtapa S.A.S.",
+            "Ahexport S.A.S.",
+            "Kawa Comercio Sostenible S.A.S.",
+            "Coffeeland S.A.S.",
+            "C.I. Kyoto S.A.S.",
+            "Latina Colombia S.A.S.",
+            "Mood Masters S.A.S."
+          ],
+          "coordinador": "Cámara de Comercio del Huila",
+          "participacion_produccion_nacional": "18.33%"
+        },
+        {
+          "region": "Norte de Santander",
+          "total_empresas": 16027,
+          "total_agentes": 17000,
+          "empresas": ["Cooperativa de Caficultores del Catatumbo", "Almacafé"],
+          "coordinador": "Cámara de Comercio de Cúcuta",
+          "produccion_anual_kg": 24500000,
+          "empleos_directos": 16000
+        },
+        {
+          "region": "Cesar",
+          "coordinador": "Cámara de Comercio de Valledupar",
+          "descripcion": "Productores, asociaciones y comercializadores locales"
+        },
+        {
+          "region": "Eje Cafetero",
+          "departamentos": ["Caldas", "Quindío", "Risaralda"],
+          "descripcion": "Región tradicional cafetera con múltiples productores y exportadores"
+        }
+      ],
+      "instituciones_apoyo": [
+        "Federación Nacional de Cafeteros de Colombia (FNC)",
+        "Comités Departamentales de Cafeteros",
+        "Comités Municipales de Cafeteros",
+        "Universidades regionales",
+        "Cámaras de Comercio"
+      ],
+      "datos_relevantes": {
+        "posicion_mundial": "2do exportador mundial",
+        "exportaciones_promedio_sacos": "14.2 millones de sacos de 60kg"
+      }
+    }
+  ],
+  "fecha_consulta": "2025-11-05"
+}
