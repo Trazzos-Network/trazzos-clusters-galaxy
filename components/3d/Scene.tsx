@@ -19,8 +19,9 @@ import MapPlane, {
 } from "./MapPlane";
 import Nodes from "./Nodes";
 import ClusterLabels from "./overlays/ClusterLabels";
+import Stars from "./Stars";
 
-const FOCUS_DISTANCE = 24;
+const FOCUS_DISTANCE = 26;
 const ACCEL_FOCUS = 0.0055;
 const DAMPING_FOCUS = 0.97;
 const LOOK_ACCEL = 0.028;
@@ -29,20 +30,18 @@ const LOOK_DAMPING = 0.95;
 interface CameraOrientation {
   defaultCameraPosition: THREE.Vector3;
   defaultLookTarget: THREE.Vector3;
+  centerOffset: THREE.Vector3;
 }
 
-function computeCameraOrientation(
-  clusters: ClusterVisualizationState[]
-): CameraOrientation {
+function computeBoundingBox(clusters: ClusterVisualizationState[]): {
+  center: THREE.Vector3;
+  span: number;
+} {
   if (!clusters.length) {
-    const fallbackHeight = MAP_PLANE_DEFAULT_SIZE * 1.5;
+    const fallbackHeight = MAP_PLANE_DEFAULT_SIZE * 1.4;
     return {
-      defaultCameraPosition: new THREE.Vector3(
-        0,
-        fallbackHeight,
-        fallbackHeight
-      ),
-      defaultLookTarget: new THREE.Vector3(0, 0, 0),
+      center: new THREE.Vector3(0, 0, 0),
+      span: fallbackHeight,
     };
   }
 
@@ -51,7 +50,7 @@ function computeCameraOrientation(
   let minZ = Infinity;
   let maxZ = -Infinity;
 
-  const halfPlaneSize = MAP_PLANE_DEFAULT_SIZE / 2;
+  const halfPlaneSize = MAP_PLANE_DEFAULT_SIZE;
 
   clusters.forEach((cluster) => {
     const [offsetX, offsetZ] = cluster.offset;
@@ -70,14 +69,10 @@ function computeCameraOrientation(
   });
 
   if (!Number.isFinite(minX) || !Number.isFinite(maxX)) {
-    const fallbackHeight = MAP_PLANE_DEFAULT_SIZE * 1.5;
+    const fallbackHeight = MAP_PLANE_DEFAULT_SIZE * 1.4;
     return {
-      defaultCameraPosition: new THREE.Vector3(
-        0,
-        fallbackHeight,
-        fallbackHeight
-      ),
-      defaultLookTarget: new THREE.Vector3(0, 0, 0),
+      center: new THREE.Vector3(0, 0, 0),
+      span: fallbackHeight,
     };
   }
 
@@ -85,24 +80,31 @@ function computeCameraOrientation(
   const centerZ = (minZ + maxZ) / 2;
   const spanX = Math.abs(maxX - minX);
   const spanZ = Math.abs(maxZ - minZ);
-  const span = Math.max(spanX, spanZ, MAP_PLANE_DEFAULT_SIZE * 1.4);
-
-  const height = span * 0.75;
-  const distance = span * 0.65;
+  const span = Math.max(spanX, spanZ, MAP_PLANE_DEFAULT_SIZE * 1.1);
 
   return {
-    defaultCameraPosition: new THREE.Vector3(
-      centerX - distance * 0.45,
-      height,
-      centerZ + distance * 0.9
-    ),
-    defaultLookTarget: new THREE.Vector3(centerX, 0, centerZ),
+    center: new THREE.Vector3(centerX, 0, centerZ),
+    span,
+  };
+}
+
+function computeCameraOrientation(
+  clusters: ClusterVisualizationState[]
+): CameraOrientation {
+  const { center, span } = computeBoundingBox(clusters);
+  const height = span * 0.9;
+
+  return {
+    defaultCameraPosition: new THREE.Vector3(0, height, 0),
+    defaultLookTarget: new THREE.Vector3(0, 0, 0),
+    centerOffset: center,
   };
 }
 
 function CameraController({
   defaultCameraPosition,
   defaultLookTarget,
+  centerOffset,
 }: CameraOrientation) {
   const { camera } = useThree();
   const selectedNode = useVisualizationStore((state) => state.selectedNode);
@@ -127,11 +129,11 @@ function CameraController({
     if (!nodeEntry) return defaultLookTarget.clone();
 
     return new THREE.Vector3(
-      nodeEntry.position[0],
+      nodeEntry.position[0] - centerOffset.x,
       nodeEntry.position[1],
-      nodeEntry.position[2]
+      nodeEntry.position[2] - centerOffset.z
     );
-  }, [defaultLookTarget, effectiveSelection, nodeIndex]);
+  }, [centerOffset, defaultLookTarget, effectiveSelection, nodeIndex]);
 
   useEffect(() => {
     camera.position.copy(defaultCameraPosition);
@@ -170,14 +172,10 @@ function CameraController({
     const parsed = parseNodeRef(effectiveSelection);
     const distanceFactor = parsed?.type === "synergy" ? 0.45 : 1;
 
-    const offsetDirection = new THREE.Vector3(-0.82, 0, 0.82).normalize();
-    const upward = new THREE.Vector3(0, 1, 0);
-
     const distance = FOCUS_DISTANCE * distanceFactor;
     const desiredPosition = targetPosition
       .clone()
-      .add(offsetDirection.clone().multiplyScalar(distance * 1.1))
-      .add(upward.clone().multiplyScalar(distance * 1.05));
+      .add(new THREE.Vector3(0, distance * 1.2, 0));
 
     const positionDiff = desiredPosition.clone().sub(camera.position);
     cameraVelocity.current.addScaledVector(positionDiff, ACCEL_FOCUS);
@@ -239,25 +237,24 @@ export default function Scene() {
   const clusters = useVisualizationStore((state) => state.clusters);
   const debug = useVisualizationStore((state) => state.debug);
 
-  const planeShadowConfigs = useMemo(
-    () =>
-      clusters.map((cluster) => {
-        const [offsetX, offsetZ] = cluster.offset;
-        const surfaceY = -0.6;
-        return {
-          id: cluster.id,
-          position: [
-            offsetX,
-            surfaceY - MAP_PLANE_DEFAULT_THICKNESS / 2,
-            offsetZ,
-          ] as [number, number, number],
-          size: MAP_PLANE_DEFAULT_SIZE,
-        };
-      }),
-    [clusters]
-  );
+  const planeShadowConfigs = useMemo(() => {
+    const { center } = computeBoundingBox(clusters);
+    return clusters.map((cluster) => {
+      const [offsetX, offsetZ] = cluster.offset;
+      const surfaceY = -0.6;
+      return {
+        id: cluster.id,
+        position: [
+          offsetX - center.x,
+          surfaceY - MAP_PLANE_DEFAULT_THICKNESS / 2,
+          offsetZ - center.z,
+        ] as [number, number, number],
+        size: MAP_PLANE_DEFAULT_SIZE,
+      };
+    });
+  }, [clusters]);
 
-  const { defaultCameraPosition, defaultLookTarget } = useMemo(
+  const { defaultCameraPosition, defaultLookTarget, centerOffset } = useMemo(
     () => computeCameraOrientation(clusters),
     [clusters]
   );
@@ -286,12 +283,16 @@ export default function Scene() {
     return helper;
   }, []);
 
+  const sceneCenter = centerOffset;
+
   return (
     <Canvas shadows gl={{ antialias: true }}>
+      <Stars count={3500} radius={420} />
       <TopCamera defaultCameraPosition={defaultCameraPosition} />
       <CameraController
         defaultCameraPosition={defaultCameraPosition}
         defaultLookTarget={defaultLookTarget}
+        centerOffset={centerOffset}
       />
       {debug.useOrbitControls && (
         <OrbitControls
@@ -308,18 +309,20 @@ export default function Scene() {
       {debug.showGrid && <primitive object={gridHelper} />}
       {debug.showAxes && <primitive object={axesHelper} />}
 
-      {clusters.map((cluster) => (
-        <MapPlane
-          key={`plane-${cluster.id}`}
-          position={[cluster.offset[0], -0.6, cluster.offset[1]]}
-          size={MAP_PLANE_DEFAULT_SIZE}
-          thickness={MAP_PLANE_DEFAULT_THICKNESS}
-        />
-      ))}
+      <group position={[-sceneCenter.x, 0, -sceneCenter.z]}>
+        {clusters.map((cluster) => (
+          <MapPlane
+            key={`plane-${cluster.id}`}
+            position={[cluster.offset[0], -0.6, cluster.offset[1]]}
+            size={MAP_PLANE_DEFAULT_SIZE}
+            thickness={MAP_PLANE_DEFAULT_THICKNESS}
+          />
+        ))}
 
-      <Nodes />
-      {debug.showLabels && <ClusterLabels />}
-      <Connections />
+        <Nodes />
+        {debug.showLabels && <ClusterLabels />}
+        <Connections />
+      </group>
       <PostProcessing />
     </Canvas>
   );

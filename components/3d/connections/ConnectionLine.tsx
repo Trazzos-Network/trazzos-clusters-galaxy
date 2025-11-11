@@ -5,12 +5,16 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { CONNECTION_COLORS } from "@/lib/utils/colors";
 import ParticleFlow from "./ParticleFlow";
-import type { Connection } from "@/lib/data/process-data";
 import type { SinergiaDetectada } from "@/types";
-import SynergyHoverCard from "./SynergyHoverCard";
+import SynergyMarker from "./SynergyHoverCard";
+import {
+  useVisualizationStore,
+  type ClusterConnection,
+} from "@/lib/store/visualization-store";
+import { createSynergyNodeId } from "@/lib/utils/node-ids";
 
 interface ConnectionLineProps {
-  connection: Connection;
+  connection: ClusterConnection;
   duplicateIndex?: number;
   duplicateCount?: number;
 }
@@ -36,6 +40,8 @@ export default function ConnectionLine({
       }
     }
   };
+
+  const setHoveredNode = useVisualizationStore((state) => state.setHoveredNode);
 
   const linePoints = useMemo(
     () =>
@@ -148,6 +154,25 @@ export default function ConnectionLine({
       ? (connection.data as SinergiaDetectada | undefined)
       : undefined;
 
+  const synergyNodeRef = useMemo(() => {
+    if (!synergyData || connection.type !== "synergy") return null;
+    return createSynergyNodeId(connection.clusterId, synergyData.id);
+  }, [connection.clusterId, connection.type, synergyData]);
+
+  const setHoverState = (value: boolean) => {
+    if (connection.type !== "synergy") return;
+    updateHover(value);
+    if (!synergyNodeRef) return;
+    const currentHovered = useVisualizationStore.getState().hoveredNode;
+    if (value) {
+      if (currentHovered !== synergyNodeRef) {
+        setHoveredNode(synergyNodeRef);
+      }
+    } else if (currentHovered === synergyNodeRef) {
+      setHoveredNode(null);
+    }
+  };
+
   const isBaseline = connection.type === "baseline";
   const particleColor = isBaseline
     ? null
@@ -184,7 +209,7 @@ export default function ConnectionLine({
           connection.type === "synergy"
             ? (event) => {
                 event.stopPropagation();
-                updateHover(true);
+                setHoverState(true);
               }
             : undefined
         }
@@ -192,7 +217,7 @@ export default function ConnectionLine({
           connection.type === "synergy"
             ? (event) => {
                 event.stopPropagation();
-                updateHover(false);
+                setHoverState(false);
               }
             : undefined
         }
@@ -212,11 +237,11 @@ export default function ConnectionLine({
         />
       )}
       {connection.type === "synergy" && synergyData && badgePosition && (
-        <SynergyHoverCard
+        <SynergyMarker
           hovered={hovered}
           position={badgePosition}
           sinergia={synergyData}
-          onHoverChange={(value) => updateHover(value)}
+          onHoverChange={(value) => setHoverState(value)}
         />
       )}
     </>

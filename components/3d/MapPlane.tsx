@@ -47,21 +47,21 @@ export default function MapPlane({
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
 
-    ctx.fillStyle = "#fff";
+    ctx.fillStyle = "#343434";
     ctx.fillRect(0, 0, texSize, texSize);
 
     const drawDot = (x: number, y: number, r: number, opacity: number) => {
       ctx.beginPath();
-      const alpha = Math.min(Math.max(opacity / 255, 0), 1);
-      ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`;
+      const alpha = opacity / 255;
+      ctx.fillStyle = `rgba(250, 250, 250, ${alpha})`;
       ctx.arc(x, y, r, 0, Math.PI * 2);
       ctx.fill();
     };
 
-    drawDot(texSize * 0.1, texSize * 0.1, 1.2, 200);
-    drawDot(texSize * 0.6, texSize * 0.1, 1.1, 200);
-    drawDot(texSize * 0.1, texSize * 0.6, 1.1, 200);
-    drawDot(texSize * 0.6, texSize * 0.6, 1.0, 200);
+    drawDot(texSize * 0.1, texSize * 0.1, 1.2, 250);
+    drawDot(texSize * 0.6, texSize * 0.1, 1.1, 250);
+    drawDot(texSize * 0.1, texSize * 0.6, 1.1, 250);
+    drawDot(texSize * 0.6, texSize * 0.6, 1.0, 250);
 
     const tex = new THREE.CanvasTexture(canvas);
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;

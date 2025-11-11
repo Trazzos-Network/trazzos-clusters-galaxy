@@ -5,6 +5,7 @@ import AuthBootstrap from "@/components/auth/AuthBootstrap";
 import AuthScopeBadge from "@/components/auth/AuthScopeBadge";
 import DebugPanel from "@/components/panels/DebugPanel";
 import InfoPanel from "@/components/panels/InfoPanel";
+import HoverInfoPanel from "@/components/panels/HoverInfoPanel";
 
 export default function Home() {
   return (
@@ -27,6 +28,7 @@ export default function Home() {
           <DebugPanel />
         </div>
         <InfoPanel />
+        <HoverInfoPanel />
       </div>
     </main>
   );

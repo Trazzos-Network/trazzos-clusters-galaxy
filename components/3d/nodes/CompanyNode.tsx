@@ -2,15 +2,51 @@
 
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as THREE from "three";
-import { Html } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 import { animated, useSpring } from "@react-spring/three";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import {
   useVisualizationStore,
   type ClusterCompany,
 } from "@/lib/store/visualization-store";
 import { NODE_COLORS } from "@/lib/utils/colors";
 import { GEOMETRIES } from "@/lib/utils/geometry";
+import type { GLTF } from "three-stdlib";
+
+function useCompanyModel(assetPath: string, targetRadius: number) {
+  const gltf = useGLTF(assetPath) as GLTF;
+  return useMemo(() => {
+    const scene = gltf.scene;
+    if (!scene) return null;
+    const cloned = scene.clone(true);
+    cloned.updateMatrixWorld(true);
+
+    const initialBox = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    initialBox.getSize(size);
+    const maxDimension = Math.max(size.x, size.y, size.z);
+    const center = new THREE.Vector3();
+    initialBox.getCenter(center);
+    cloned.position.sub(center);
+
+    cloned.updateMatrixWorld(true);
+    const centeredBox = new THREE.Box3().setFromObject(cloned);
+    const lift = -centeredBox.min.y;
+    cloned.position.y += lift;
+
+    const scale = maxDimension > 0 ? (targetRadius * 1.75) / maxDimension : 1;
+    const group = new THREE.Group();
+    cloned.traverse((child) => {
+      if (child instanceof THREE.Mesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    group.add(cloned);
+    group.scale.setScalar(scale);
+    return group;
+  }, [gltf.scene, targetRadius]);
+}
 
 interface CompanyNodeProps {
   company: ClusterCompany;
@@ -39,12 +75,21 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
   const sinergias = useVisualizationStore(
     (state) => state.clusterIndex[company.clusterId]?.sinergias ?? []
   );
-  const { camera } = useThree();
-
   const nodeColor = NODE_COLORS.company;
   const isSelected = selectedNode === company.nodeId;
   const isFocus = company.isFocus ?? false;
   const focusSegments = Math.max(company.focusSegments ?? 8, 3);
+  const normalizedEmpresa = useMemo(
+    () => company.empresa.replace(/\s+/g, "").toLowerCase(),
+    [company.empresa]
+  );
+  const isMyCompany = useMemo(
+    () => normalizedEmpresa.includes("argos"),
+    [normalizedEmpresa]
+  );
+  const shouldShowModel = Boolean(selectedNode);
+  const modelGroupRef = useRef<THREE.Group>(null);
+  const connectionMode = useVisualizationStore((state) => state.connectionMode);
 
   const geometry = useMemo(() => GEOMETRIES.company, []);
   const baseDimensions = useMemo(() => {
@@ -93,6 +138,12 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     isFocus,
   ]);
 
+  const isPrimaryModel = isFocus && isMyCompany;
+  const modelAssetPath = isPrimaryModel
+    ? "/company.glb"
+    : "/company-secondary.glb";
+  const companyModel = useCompanyModel(modelAssetPath, baseDimensions.radius);
+
   const relatedSynergies = useMemo(
     () =>
       sinergias.filter((sinergia) =>
@@ -100,6 +151,24 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
       ),
     [sinergias, company.empresa]
   );
+
+  const potentialSavings = useMemo(
+    () =>
+      relatedSynergies.reduce(
+        (acc, sinergia) => acc + (sinergia.ahorro_estimado_monto ?? 0),
+        0
+      ),
+    [relatedSynergies]
+  );
+
+  const formattedSavings = useMemo(() => {
+    if (potentialSavings <= 0) return null;
+    return new Intl.NumberFormat("es-CO", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: potentialSavings >= 10000 ? 0 : 2,
+    }).format(potentialSavings);
+  }, [potentialSavings]);
 
   const plasmaMaterials = useMemo(() => {
     const map = new Map<string, THREE.ShaderMaterial>();
@@ -165,8 +234,13 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     const center = size / 2;
 
     const trimmed = company.empresa.trim();
-    const primaryLetter = trimmed.charAt(0).toUpperCase();
-    const secondaryLetter = trimmed.charAt(1)?.toLowerCase() ?? "";
+    let letterSource = trimmed;
+    if (isMyCompany && (isFocus || isSelected)) {
+      letterSource = trimmed.slice(1);
+    }
+    const sanitized = letterSource.replace(/\s+/g, "");
+    const primaryLetter = sanitized.charAt(0)?.toUpperCase() ?? "";
+    const secondaryLetter = sanitized.charAt(1)?.toLowerCase() ?? "";
 
     ctx.fillStyle = "#f8fcf1";
     ctx.globalAlpha = 0.95;
@@ -215,21 +289,15 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     texture.needsUpdate = true;
     texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
     return texture;
-  }, [company.empresa]);
+  }, [company.empresa, isFocus, isMyCompany, isSelected]);
+
+  const topMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
 
   const { scale, aperture } = useSpring({
     scale: hovered || isSelected ? 1.18 : 1,
     aperture: isSelected && cameraSettled ? 1 : 0,
     config: { tension: 110, friction: 16, precision: 0.0001 },
   });
-
-  const tooltipHeight = baseDimensions.height / 2 + 0.85;
-  const tooltipRadius = baseDimensions.depth * 0.85 + 0.95;
-  const [tooltipPos, setTooltipPos] = useState<[number, number, number]>([
-    0,
-    tooltipHeight,
-    tooltipRadius,
-  ]);
 
   const labelPosition = useMemo(
     () =>
@@ -260,6 +328,148 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     };
   }, [baseDimensions.geometry]);
 
+  const blackHoleGeometry = useMemo(() => {
+    const radius = baseDimensions.radius * 1.65;
+    return new THREE.PlaneGeometry(radius, radius, 1, 1);
+  }, [baseDimensions.radius]);
+
+  useEffect(() => {
+    return () => {
+      blackHoleGeometry.dispose();
+    };
+  }, [blackHoleGeometry]);
+
+  const companyModelOffset = useMemo(
+    () => baseDimensions.height * 0.32 + 0.24,
+    [baseDimensions.height]
+  );
+  const modelTopHeight = useMemo(
+    () => companyModelOffset + baseDimensions.radius * 1.75,
+    [baseDimensions.radius, companyModelOffset]
+  );
+
+  const modelSpring = useSpring({
+    position: shouldShowModel
+      ? ([0, companyModelOffset, 0] as [number, number, number])
+      : ([0, companyModelOffset - 0.6, 0] as [number, number, number]),
+    scale: shouldShowModel ? 1 : 0.001,
+    glow: shouldShowModel ? 1 : 0,
+    config: shouldShowModel
+      ? { mass: 0.8, tension: 260, friction: 18, precision: 0.0001 }
+      : { mass: 0.9, tension: 190, friction: 22, precision: 0.0001 },
+  });
+  const {
+    position: modelPosition,
+    scale: modelScale,
+    glow: modelGlow,
+  } = modelSpring;
+
+  useEffect(() => {
+    if (!isMyCompany) return;
+    if (!isFocus) return;
+    if (isSelected) return;
+    if (connectionMode !== "focus") return;
+
+    setSelectedNode(company.nodeId);
+    setConnectionMode("focus");
+  }, [
+    company.nodeId,
+    isFocus,
+    isMyCompany,
+    isSelected,
+    connectionMode,
+    setConnectionMode,
+    setSelectedNode,
+  ]);
+
+  const blackHoleMaterialRef = useRef<THREE.ShaderMaterial | null>(null);
+  const [renderBlackHoleMaterial, setRenderBlackHoleMaterial] =
+    useState<THREE.ShaderMaterial | null>(null);
+
+  useEffect(() => {
+    let frameId: number | null = null;
+
+    if (!isFocus) {
+      if (blackHoleMaterialRef.current) {
+        blackHoleMaterialRef.current.dispose();
+        blackHoleMaterialRef.current = null;
+      }
+      frameId = requestAnimationFrame(() => {
+        setRenderBlackHoleMaterial(null);
+      });
+      return () => {
+        if (frameId !== null) {
+          cancelAnimationFrame(frameId);
+        }
+      };
+    }
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        aperture: { value: 0 },
+      },
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending,
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float time;
+        uniform float aperture;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 centered = vUv - 0.5;
+          float r = length(centered) * 1.4;
+          float angle = atan(centered.y, centered.x);
+
+          float swirl = sin(angle * 16.0 - time * 2.5);
+          float glow = smoothstep(1.2, 0.2, r);
+          float gravity = smoothstep(0.3, 0.6, r);
+          float alpha = clamp((1.0 - r) * (0.75 + swirl * 0.2), 0.0, 1.0);
+          alpha *= glow;
+          alpha = pow(alpha, 1.3);
+
+          vec3 rimColor = vec3(0.35, 0.78, 0.45);
+          vec3 innerColor = vec3(0.02, 0.03, 0.05);
+          vec3 color = mix(innerColor, rimColor, glow) + swirl * 0.08;
+          color *= mix(0.4, 1.15, glow);
+          color *= mix(1.0, 0.55, gravity);
+
+          float finalAlpha = clamp(alpha * aperture, 0.0, 1.0);
+
+          if (finalAlpha < 0.01) discard;
+          gl_FragColor = vec4(color, finalAlpha);
+        }
+      `,
+    });
+
+    if (blackHoleMaterialRef.current) {
+      blackHoleMaterialRef.current.dispose();
+    }
+    blackHoleMaterialRef.current = material;
+    frameId = requestAnimationFrame(() => {
+      setRenderBlackHoleMaterial(material);
+    });
+
+    return () => {
+      if (frameId !== null) {
+        cancelAnimationFrame(frameId);
+      }
+      material.dispose();
+      if (blackHoleMaterialRef.current === material) {
+        blackHoleMaterialRef.current = null;
+      }
+    };
+  }, [isFocus]);
+
   useFrame((state, delta) => {
     const apertureValue = aperture.get();
 
@@ -280,35 +490,34 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
       );
     });
 
-    if (hovered && !showLabels) {
-      const companyPosition = new THREE.Vector3(
-        company.position3D[0],
-        company.position3D[1],
-        company.position3D[2]
+    const holeMaterial = blackHoleMaterialRef.current;
+    if (holeMaterial) {
+      holeMaterial.uniforms.time.value += delta * 1.6;
+      holeMaterial.uniforms.aperture.value = THREE.MathUtils.lerp(
+        holeMaterial.uniforms.aperture.value,
+        apertureValue,
+        0.12
       );
-      const toCamera = new THREE.Vector3()
-        .subVectors(camera.position, companyPosition)
-        .setY(0);
-      const north = new THREE.Vector3(0, 0, 1);
-      const blended =
-        toCamera.lengthSq() > 1e-6 ? toCamera.normalize() : north.clone();
-      const offsetDir = north.clone().lerp(blended, 0.35).normalize();
-      offsetDir.multiplyScalar(tooltipRadius);
-      const target: [number, number, number] = [
-        offsetDir.x,
-        tooltipHeight,
-        offsetDir.z,
-      ];
-      setTooltipPos((prev) => {
-        if (
-          Math.abs(prev[0] - target[0]) < 0.01 &&
-          Math.abs(prev[1] - target[1]) < 0.01 &&
-          Math.abs(prev[2] - target[2]) < 0.01
-        ) {
-          return prev;
-        }
-        return target;
-      });
+    }
+
+    if (topMaterialRef.current) {
+      const fadeBase = topTexture ? Math.max(0, 1 - apertureValue * 1.15) : 0;
+      const scaleValue = modelScale.get();
+      const fadeFromScale = 1 - THREE.MathUtils.clamp(scaleValue * 1.4, 0, 1);
+      topMaterialRef.current.opacity = fadeBase * fadeFromScale;
+    }
+
+    if (modelGroupRef.current) {
+      const scaleValue = modelScale.get();
+      if (scaleValue > 0.02) {
+        modelGroupRef.current.rotation.y += delta * 0.7;
+      } else {
+        modelGroupRef.current.rotation.y = THREE.MathUtils.lerp(
+          modelGroupRef.current.rotation.y,
+          0,
+          0.12
+        );
+      }
     }
   });
 
@@ -317,12 +526,22 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     baseDimensions.height / 2 + 0.011 - value * 0.55,
     0,
   ]) as unknown as [number, number, number];
+  const lidTwist = useMemo(() => {
+    if (!isFocus) return 0;
+    const segments = baseDimensions.segments ?? 1;
+    return segments > 0 ? (Math.PI * 2) / segments / 2 : 0;
+  }, [baseDimensions.segments, isFocus]);
+  const showFocusModel = shouldShowModel;
   const portalScale = aperture.to((value) => [
     value,
     value,
     value,
   ]) as unknown as [number, number, number];
-
+  const showSavingsCard =
+    isMyCompany &&
+    formattedSavings &&
+    relatedSynergies.length > 0 &&
+    Boolean(showFocusModel && renderBlackHoleMaterial);
   return (
     <animated.group
       ref={meshRef}
@@ -358,29 +577,56 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
         />
       </mesh>
 
-      <animated.mesh
-        position={lidPosition}
-        rotation={[
-          -Math.PI / 2,
-          0,
-          isFocus ? (Math.PI * 2) / (baseDimensions.segments ?? 1) / 2 : 0,
-        ]}
+      <animated.group position={lidPosition}>
+        <mesh rotation={[-Math.PI / 2, 0, lidTwist]} visible={!showFocusModel}>
+          <circleGeometry
+            args={[baseDimensions.radius, baseDimensions.segments]}
+          />
+          <meshStandardMaterial
+            ref={topMaterialRef}
+            map={topTexture ?? undefined}
+            color="#ffffff"
+            transparent
+            opacity={topTexture ? 1 : 0}
+            metalness={0.1}
+            roughness={0.4}
+            emissive="#000000"
+            emissiveIntensity={0}
+            toneMapped={false}
+          />
+        </mesh>
+      </animated.group>
+
+      {isFocus && renderBlackHoleMaterial && (
+        <mesh
+          geometry={blackHoleGeometry}
+          position={[0, baseDimensions.height / 2 + 0.02, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          material={renderBlackHoleMaterial}
+          renderOrder={4}
+        />
+      )}
+
+      <animated.group
+        ref={modelGroupRef}
+        position={modelPosition}
+        scale={modelScale.to((value) => value / 1.4)}
+        renderOrder={5}
       >
-        <circleGeometry
-          args={[baseDimensions.radius, baseDimensions.segments]}
-        />
-        <meshStandardMaterial
-          map={topTexture ?? undefined}
-          color="#ffffff"
-          transparent
-          opacity={topTexture ? 1 : 0}
-          metalness={0.1}
-          roughness={0.4}
-          emissive="#000000"
-          emissiveIntensity={0}
-          toneMapped={false}
-        />
-      </animated.mesh>
+        {shouldShowModel && companyModel && (
+          <>
+            <primitive object={companyModel} />
+            {isPrimaryModel && (
+              <animated.pointLight
+                color="#b0f5ff"
+                intensity={modelGlow.to((value) => 0.8 + value * 0.6)}
+                distance={2.8}
+                decay={2}
+              />
+            )}
+          </>
+        )}
+      </animated.group>
 
       <animated.group
         ref={portalGroupRef}
@@ -429,19 +675,24 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
         </Html>
       )}
 
-      {hovered && !showLabels && (
-        <Html position={tooltipPos} center pointerEvents="none">
-          <div className="px-4 py-3 rounded-lg bg-[#131313]/92 border border-[#74b600]/35 text-white text-sm shadow-2xl min-w-[200px]">
-            <p className="text-base font-semibold text-[#cbffc4] mb-2">
-              {company.location.name}
+      {showSavingsCard && (
+        <Html
+          position={[0, modelTopHeight, 0]}
+          center
+          transform
+          sprite
+          distanceFactor={10}
+        >
+          <div className="rounded-2xl max-w-[200px] border border-primary bg-card/65 px-6 py-4 text-center text-white shadow-[0_28px_55px_-25px_rgba(0,0,0,0.9)] backdrop-blur-lg">
+            <p className="text-xs uppercase tracking-[0.36em] text-white/50">
+              Potencial de ahorro
             </p>
-            <p className="text-xs text-white/80 mb-1">
-              Lat: {company.location.lat.toFixed(4)} · Lon:{" "}
-              {company.location.lon.toFixed(4)}
+            <p className="text-2xl font-semibold text-[#cbffc4]">
+              {formattedSavings}
             </p>
-            <p className="text-xs text-white/70">
-              Paradas: {company.paradas.length} · Necesidades:{" "}
-              {company.necesidades.length}
+            <p className="text-sm text-white/60">
+              {relatedSynergies.length} sinergia
+              {relatedSynergies.length === 1 ? "" : "s"} activas
             </p>
           </div>
         </Html>
@@ -449,3 +700,6 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     </animated.group>
   );
 }
+
+useGLTF.preload("/company.glb");
+useGLTF.preload("/company-secondary.glb");

@@ -5,13 +5,15 @@ import * as THREE from "three";
 import { Line } from "@react-three/drei";
 import { CONNECTION_COLORS } from "@/lib/utils/colors";
 import ParticleFlow from "./ParticleFlow";
-import SynergyHoverCard, {
+import SynergyMarker, {
   getSynergyStateMeta,
   type SynergyStateMeta,
 } from "./SynergyHoverCard";
 import type { ClusterConnection } from "@/lib/store/visualization-store";
 import type { SinergiaDetectada } from "@/types";
 import { Html } from "@react-three/drei";
+import { useVisualizationStore } from "@/lib/store/visualization-store";
+import { createSynergyNodeId, type NodeRef } from "@/lib/utils/node-ids";
 
 interface GroupedSynergyConnectionProps {
   connections: ClusterConnection[];
@@ -123,6 +125,7 @@ export default function GroupedSynergyConnection({
   const insidePointerDown = useRef(false);
   const animationProgressRef = useRef(0);
   const [animationProgress, setAnimationProgress] = useState(0);
+  const setHoveredNode = useVisualizationStore((state) => state.setHoveredNode);
 
   const linePoints = useMemo(
     () =>
@@ -211,6 +214,26 @@ export default function GroupedSynergyConnection({
     return new THREE.Vector3(midPoint.x, midPoint.y + 0.6, midPoint.z);
   }, [midPoint]);
 
+  const connectionNodeRefs = useMemo(() => {
+    return connections.map((connection) => {
+      const sinergia = connection.data as SinergiaDetectada | undefined;
+      if (!sinergia) return null;
+      return createSynergyNodeId(connection.clusterId, sinergia.id);
+    });
+  }, [connections]);
+
+  const nodeRefSet = useMemo(() => {
+    return new Set(
+      connectionNodeRefs.filter((ref): ref is NodeRef => Boolean(ref))
+    );
+  }, [connectionNodeRefs]);
+
+  const primaryNodeRef = useMemo(() => {
+    return (
+      connectionNodeRefs.find((ref): ref is NodeRef => Boolean(ref)) ?? null
+    );
+  }, [connectionNodeRefs]);
+
   const offsetVectors = useMemo(() => {
     if (!midPoint || !pathMetrics || connections.length <= 1) return [];
 
@@ -294,6 +317,12 @@ export default function GroupedSynergyConnection({
     if (!isExpanded) {
       setIsExpanded(true);
     }
+    if (primaryNodeRef) {
+      const current = useVisualizationStore.getState().hoveredNode;
+      if (current !== primaryNodeRef) {
+        setHoveredNode(primaryNodeRef);
+      }
+    }
   };
 
   const handleLeave = () => {
@@ -301,6 +330,10 @@ export default function GroupedSynergyConnection({
     if (hoverDepth.current === 0) {
       setGroupHovered(false);
       setActiveIndex(null);
+      const current = useVisualizationStore.getState().hoveredNode;
+      if (current && nodeRefSet.has(current)) {
+        setHoveredNode(null);
+      }
       // Collapse after a short delay for smoother animation
       setTimeout(() => {
         if (hoverDepth.current === 0) {
@@ -311,12 +344,29 @@ export default function GroupedSynergyConnection({
   };
 
   const handleCardHoverChange = (hovered: boolean, index: number) => {
+    const nodeRef = connectionNodeRefs[index];
     if (hovered) {
       handleEnter();
       setActiveIndex(index);
+      if (nodeRef) {
+        const current = useVisualizationStore.getState().hoveredNode;
+        if (current !== nodeRef) {
+          setHoveredNode(nodeRef);
+        }
+      }
     } else {
       handleLeave();
       setActiveIndex((prev) => (prev === index ? null : prev));
+      if (nodeRef) {
+        const current = useVisualizationStore.getState().hoveredNode;
+        if (hoverDepth.current > 0 && primaryNodeRef) {
+          if (current !== primaryNodeRef) {
+            setHoveredNode(primaryNodeRef);
+          }
+        } else if (nodeRefSet.has(nodeRef) && current === nodeRef) {
+          setHoveredNode(null);
+        }
+      }
     }
   };
 
@@ -380,7 +430,7 @@ export default function GroupedSynergyConnection({
             if (!sinergia) return null;
 
             return (
-              <SynergyHoverCard
+              <SynergyMarker
                 key={`${connection.id}-expanded`}
                 hovered={activeIndex === index}
                 position={position}
