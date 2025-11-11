@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-
+import { useMemo, useState } from "react";
+import * as THREE from "three";
 import {
   useVisualizationStore,
   type VisualizationState,
@@ -52,6 +52,32 @@ export default function DebugPanel() {
   const setConnectionMode = useVisualizationStore(
     (state) => state.setConnectionMode
   );
+  const cameraTelemetry = useVisualizationStore(
+    (state) => state.cameraTelemetry
+  );
+
+  const cameraInfo = useMemo(() => {
+    const toFixed = (value: number, digits = 2) => value.toFixed(digits);
+    const toDeg = (rad: number) => THREE.MathUtils.radToDeg(rad);
+
+    return {
+      position: {
+        x: toFixed(cameraTelemetry.position[0]),
+        y: toFixed(cameraTelemetry.position[1]),
+        z: toFixed(cameraTelemetry.position[2]),
+      },
+      direction: {
+        x: toFixed(cameraTelemetry.direction[0], 3),
+        y: toFixed(cameraTelemetry.direction[1], 3),
+        z: toFixed(cameraTelemetry.direction[2], 3),
+      },
+      rotation: {
+        x: toDeg(cameraTelemetry.rotation[0]).toFixed(2),
+        y: toDeg(cameraTelemetry.rotation[1]).toFixed(2),
+        z: toDeg(cameraTelemetry.rotation[2]).toFixed(2),
+      },
+    };
+  }, [cameraTelemetry]);
 
   return (
     <div className="z-100 w-72 overflow-hidden rounded-lg border border-white/10 bg-[#0f0f0f]/90 shadow-lg backdrop-blur">
@@ -82,6 +108,26 @@ export default function DebugPanel() {
           isOpen ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
         }`}
       >
+        <div className="space-y-2 rounded-md border border-white/10 p-3 text-xs text-white/70">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-white/45">
+            Cámara
+          </p>
+          <div className="space-y-1">
+            <p>
+              Posición · x {cameraInfo.position.x} · y {cameraInfo.position.y} ·
+              z {cameraInfo.position.z}
+            </p>
+            <p>
+              Orientación · pitch {cameraInfo.rotation.x}° · yaw{" "}
+              {cameraInfo.rotation.y}° · roll {cameraInfo.rotation.z}°
+            </p>
+            <p>
+              Dirección · x {cameraInfo.direction.x} · y{" "}
+              {cameraInfo.direction.y} · z {cameraInfo.direction.z}
+            </p>
+          </div>
+        </div>
+
         <div className="space-y-2 rounded-md border border-white/10 p-2">
           <div className="flex flex-col gap-2 text-sm text-white">
             <label className="flex items-center space-x-2 cursor-pointer">

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
+import { animated, useSpring } from "@react-spring/three";
 import { Bloom, EffectComposer } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import * as THREE from "three";
@@ -22,10 +23,13 @@ import ClusterLabels from "./overlays/ClusterLabels";
 import Stars from "./Stars";
 
 const FOCUS_DISTANCE = 26;
-const ACCEL_FOCUS = 0.0055;
-const DAMPING_FOCUS = 0.97;
-const LOOK_ACCEL = 0.028;
-const LOOK_DAMPING = 0.95;
+const ACCEL_FOCUS = 0.0032;
+const DAMPING_FOCUS = 0.92;
+const LOOK_ACCEL = 0.02;
+const LOOK_DAMPING = 0.9;
+const TILT_SENSITIVITY = 0.05;
+const TILT_LERP = 0.06;
+const MAX_TILT = THREE.MathUtils.degToRad(3);
 
 interface CameraOrientation {
   defaultCameraPosition: THREE.Vector3;
@@ -112,6 +116,9 @@ function CameraController({
   const setCameraSettled = useVisualizationStore(
     (state) => state.setCameraSettled
   );
+  const setCameraTelemetry = useVisualizationStore(
+    (state) => state.setCameraTelemetry
+  );
   const useOrbitControls = useVisualizationStore(
     (state) => state.debug.useOrbitControls
   );
@@ -120,6 +127,8 @@ function CameraController({
   const lookVelocity = useRef(new THREE.Vector3());
   const lookTarget = useRef(defaultLookTarget.clone());
   const lastSelection = useRef<string | null>(null);
+  const mouseTilt = useRef(new THREE.Vector2(0, 0));
+  const tiltVelocity = useRef(new THREE.Vector2(0, 0));
 
   const effectiveSelection = hasInteracted ? selectedNode : null;
 
@@ -149,7 +158,7 @@ function CameraController({
     }
   }, [effectiveSelection]);
 
-  useFrame((_, delta) => {
+  useFrame((state, delta) => {
     if (useOrbitControls) {
       setCameraSettled(true);
       return;
@@ -175,7 +184,7 @@ function CameraController({
     const distance = FOCUS_DISTANCE * distanceFactor;
     const desiredPosition = targetPosition
       .clone()
-      .add(new THREE.Vector3(0, distance * 1.2, 0));
+      .add(new THREE.Vector3(-distance * 0.5, distance * 0.75, distance * 0.5));
 
     const positionDiff = desiredPosition.clone().sub(camera.position);
     cameraVelocity.current.addScaledVector(positionDiff, ACCEL_FOCUS);
@@ -187,12 +196,52 @@ function CameraController({
     lookVelocity.current.multiplyScalar(LOOK_DAMPING);
     lookTarget.current.addScaledVector(lookVelocity.current, dt * 30);
 
-    camera.lookAt(lookTarget.current);
+    const pointer = state.pointer;
+    const targetTiltX = THREE.MathUtils.clamp(
+      pointer.y * TILT_SENSITIVITY,
+      -MAX_TILT,
+      MAX_TILT
+    );
+    const targetTiltY = THREE.MathUtils.clamp(
+      pointer.x * TILT_SENSITIVITY,
+      -MAX_TILT,
+      MAX_TILT
+    );
+    tiltVelocity.current.lerp(
+      new THREE.Vector2(targetTiltX, targetTiltY),
+      TILT_LERP
+    );
+    mouseTilt.current.copy(tiltVelocity.current);
+
+    const tiltMatrix = new THREE.Matrix4()
+      .makeRotationX(mouseTilt.current.x)
+      .multiply(new THREE.Matrix4().makeRotationY(mouseTilt.current.y));
+    const tiltedForward = new THREE.Vector3(0, 0, -1).applyMatrix4(tiltMatrix);
+    const tiltedUp = new THREE.Vector3(0, 1, 0).applyMatrix4(tiltMatrix);
+
+    const cameraDirection = lookTarget.current.clone().sub(camera.position);
+    const baseOrientation = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, -1),
+      cameraDirection.clone().normalize()
+    );
+    const tiltQuaternion = new THREE.Quaternion().setFromRotationMatrix(
+      new THREE.Matrix4().lookAt(new THREE.Vector3(), tiltedForward, tiltedUp)
+    );
+    baseOrientation.multiply(tiltQuaternion);
+    camera.quaternion.slerp(baseOrientation, 0.12);
+
+    const worldDir = new THREE.Vector3();
+    camera.getWorldDirection(worldDir);
+    setCameraTelemetry({
+      position: [camera.position.x, camera.position.y, camera.position.z],
+      rotation: [camera.rotation.x, camera.rotation.y, camera.rotation.z],
+      direction: [worldDir.x, worldDir.y, worldDir.z],
+    });
 
     const hasSettled =
-      positionDiff.length() < 0.4 &&
-      lookDiff.length() < 0.4 &&
-      cameraVelocity.current.length() < 0.02;
+      positionDiff.length() < 0.25 &&
+      lookDiff.length() < 0.25 &&
+      cameraVelocity.current.length() < 0.01;
     setCameraSettled(hasSettled);
   });
 
@@ -236,6 +285,8 @@ function PostProcessing() {
 export default function Scene() {
   const clusters = useVisualizationStore((state) => state.clusters);
   const debug = useVisualizationStore((state) => state.debug);
+  const selectedNode = useVisualizationStore((state) => state.selectedNode);
+  const hasInteracted = useVisualizationStore((state) => state.hasInteracted);
 
   const planeShadowConfigs = useMemo(() => {
     const { center } = computeBoundingBox(clusters);
@@ -285,6 +336,11 @@ export default function Scene() {
 
   const sceneCenter = centerOffset;
 
+  const groundSpring = useSpring({
+    scale: hasInteracted && selectedNode ? 1 : 0,
+    config: { tension: 120, friction: 18, precision: 0.0001 },
+  });
+
   return (
     <Canvas shadows gl={{ antialias: true }}>
       <Stars count={3500} radius={420} />
@@ -310,14 +366,19 @@ export default function Scene() {
       {debug.showAxes && <primitive object={axesHelper} />}
 
       <group position={[-sceneCenter.x, 0, -sceneCenter.z]}>
-        {clusters.map((cluster) => (
-          <MapPlane
-            key={`plane-${cluster.id}`}
-            position={[cluster.offset[0], -0.6, cluster.offset[1]]}
-            size={MAP_PLANE_DEFAULT_SIZE}
-            thickness={MAP_PLANE_DEFAULT_THICKNESS}
-          />
-        ))}
+        <animated.group
+          scale={groundSpring.scale.to((value) => [value, value, value])}
+          name="ground"
+        >
+          {clusters.map((cluster) => (
+            <MapPlane
+              key={`plane-${cluster.id}`}
+              position={[cluster.offset[0], -0.6, cluster.offset[1]]}
+              size={MAP_PLANE_DEFAULT_SIZE}
+              thickness={MAP_PLANE_DEFAULT_THICKNESS}
+            />
+          ))}
+        </animated.group>
 
         <Nodes />
         {debug.showLabels && <ClusterLabels />}

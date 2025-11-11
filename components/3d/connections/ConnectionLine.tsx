@@ -165,9 +165,7 @@ export default function ConnectionLine({
     if (!synergyNodeRef) return;
     const currentHovered = useVisualizationStore.getState().hoveredNode;
     if (value) {
-      if (currentHovered !== synergyNodeRef) {
-        setHoveredNode(synergyNodeRef);
-      }
+      setHoveredNode(synergyNodeRef);
     } else if (currentHovered === synergyNodeRef) {
       setHoveredNode(null);
     }

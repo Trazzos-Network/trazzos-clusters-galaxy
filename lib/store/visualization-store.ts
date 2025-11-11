@@ -58,6 +58,12 @@ export interface ClusterConnection extends Connection {
   };
 }
 
+interface CameraTelemetry {
+  position: [number, number, number];
+  rotation: [number, number, number];
+  direction: [number, number, number];
+}
+
 export interface ClusterVisualizationState {
   id: string;
   etiqueta: string;
@@ -679,6 +685,7 @@ export interface VisualizationState {
   enrichedCompanies: ClusterCompany[];
   connections: ClusterConnection[];
   naturalConnections: ClusterConnection[];
+  cameraTelemetry: CameraTelemetry;
   debug: {
     showAxes: boolean;
     showGrid: boolean;
@@ -703,12 +710,22 @@ export interface VisualizationState {
   registerInteraction: () => void;
   resetInteraction: () => void;
   setCameraSettled: (settled: boolean) => void;
+  setCameraTelemetry: (telemetry: CameraTelemetry) => void;
   setDebugOption: <K extends keyof VisualizationState["debug"]>(
     option: K,
     value: VisualizationState["debug"][K]
   ) => void;
   regenerateConnections: () => void;
   personalizeForCompany: (empresa: Empresa | null) => void;
+}
+
+function hasTelemetryChanged(prev: CameraTelemetry, next: CameraTelemetry) {
+  for (let i = 0; i < 3; i += 1) {
+    if (Math.abs(prev.position[i] - next.position[i]) > 0.001) return true;
+    if (Math.abs(prev.rotation[i] - next.rotation[i]) > 0.001) return true;
+    if (Math.abs(prev.direction[i] - next.direction[i]) > 0.001) return true;
+  }
+  return false;
 }
 
 export const useVisualizationStore = create<VisualizationState>((set) => ({
@@ -722,6 +739,11 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
   connections: DEFAULT_CONNECTIONS,
   naturalConnections: DEFAULT_NATURAL_CONNECTIONS,
   synergyPositions: DEFAULT_SYNERGY_POSITIONS,
+  cameraTelemetry: {
+    position: [0, 0, 0],
+    rotation: [0, 0, 0],
+    direction: [0, 0, -1],
+  },
   debug: {
     showAxes: false,
     showGrid: false,
@@ -757,6 +779,12 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
       cameraSettled: false,
     }),
   setCameraSettled: (settled) => set({ cameraSettled: settled }),
+  setCameraTelemetry: (telemetry) =>
+    set((state) =>
+      hasTelemetryChanged(state.cameraTelemetry, telemetry)
+        ? { cameraTelemetry: telemetry }
+        : state
+    ),
   setDebugOption: (option, value) =>
     set((state) => ({
       debug: {

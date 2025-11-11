@@ -221,76 +221,6 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     return map;
   }, [relatedSynergies]);
 
-  const topTexture = useMemo(() => {
-    const size = 512;
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return null;
-
-    ctx.clearRect(0, 0, size, size);
-
-    const center = size / 2;
-
-    const trimmed = company.empresa.trim();
-    let letterSource = trimmed;
-    if (isMyCompany && (isFocus || isSelected)) {
-      letterSource = trimmed.slice(1);
-    }
-    const sanitized = letterSource.replace(/\s+/g, "");
-    const primaryLetter = sanitized.charAt(0)?.toUpperCase() ?? "";
-    const secondaryLetter = sanitized.charAt(1)?.toLowerCase() ?? "";
-
-    ctx.fillStyle = "#f8fcf1";
-    ctx.globalAlpha = 0.95;
-    ctx.beginPath();
-    ctx.arc(center, center, size, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.fill();
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = "rgba(255,255,255,0.35)";
-    ctx.lineWidth = size * 0.01;
-    ctx.beginPath();
-    ctx.arc(center, center, size * 0.39, 0, Math.PI * 2);
-    ctx.closePath();
-    ctx.stroke();
-
-    ctx.fillStyle = NODE_COLORS.company;
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-
-    if (secondaryLetter) {
-      ctx.font = `700 ${
-        size * 0.42
-      }px 'Inter', 'Helvetica', 'Arial', sans-serif`;
-      ctx.fillText(
-        primaryLetter,
-        size / 2 - size * 0.08,
-        size / 2 + size * 0.02
-      );
-      ctx.font = `500 ${
-        size * 0.28
-      }px 'Inter', 'Helvetica', 'Arial', sans-serif`;
-      ctx.fillText(
-        secondaryLetter,
-        size / 2 + size * 0.22,
-        size / 2 + size * 0.05
-      );
-    } else {
-      ctx.font = `700 ${
-        size * 0.5
-      }px 'Inter', 'Helvetica', 'Arial', sans-serif`;
-      ctx.fillText(primaryLetter, size / 2, size / 2 + size * 0.02);
-    }
-
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.anisotropy = 8;
-    texture.needsUpdate = true;
-    texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-    return texture;
-  }, [company.empresa, isFocus, isMyCompany, isSelected]);
-
   const topMaterialRef = useRef<THREE.MeshStandardMaterial | null>(null);
 
   const { scale, aperture } = useSpring({
@@ -311,10 +241,9 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
 
   useEffect(() => {
     return () => {
-      topTexture?.dispose();
       document.body.style.cursor = "auto";
     };
-  }, [topTexture]);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -500,13 +429,6 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
       );
     }
 
-    if (topMaterialRef.current) {
-      const fadeBase = topTexture ? Math.max(0, 1 - apertureValue * 1.15) : 0;
-      const scaleValue = modelScale.get();
-      const fadeFromScale = 1 - THREE.MathUtils.clamp(scaleValue * 1.4, 0, 1);
-      topMaterialRef.current.opacity = fadeBase * fadeFromScale;
-    }
-
     if (modelGroupRef.current) {
       const scaleValue = modelScale.get();
       if (scaleValue > 0.02) {
@@ -578,20 +500,15 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
       </mesh>
 
       <animated.group position={lidPosition}>
-        <mesh rotation={[-Math.PI / 2, 0, lidTwist]} visible={!showFocusModel}>
+        <mesh rotation={[-Math.PI / 2, 0, lidTwist]}>
           <circleGeometry
             args={[baseDimensions.radius, baseDimensions.segments]}
           />
           <meshStandardMaterial
             ref={topMaterialRef}
-            map={topTexture ?? undefined}
-            color="#ffffff"
-            transparent
-            opacity={topTexture ? 1 : 0}
-            metalness={0.1}
-            roughness={0.4}
-            emissive="#000000"
-            emissiveIntensity={0}
+            color="#f5f8f2"
+            metalness={0.08}
+            roughness={0.35}
             toneMapped={false}
           />
         </mesh>

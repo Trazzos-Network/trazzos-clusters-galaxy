@@ -12,10 +12,10 @@ export default function Nodes() {
   if (!filters.companies) return null;
 
   return (
-    <>
+    <group name="companies">
       {enrichedCompanies.map((company) => (
         <CompanyNode key={company.nodeId} company={company} />
       ))}
-    </>
+    </group>
   );
 }
