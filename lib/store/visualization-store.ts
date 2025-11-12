@@ -686,6 +686,7 @@ export interface VisualizationState {
   connections: ClusterConnection[];
   naturalConnections: ClusterConnection[];
   cameraTelemetry: CameraTelemetry;
+  xrMode: boolean;
   debug: {
     showAxes: boolean;
     showGrid: boolean;
@@ -711,6 +712,7 @@ export interface VisualizationState {
   resetInteraction: () => void;
   setCameraSettled: (settled: boolean) => void;
   setCameraTelemetry: (telemetry: CameraTelemetry) => void;
+  setXRMode: (value: boolean) => void;
   setDebugOption: <K extends keyof VisualizationState["debug"]>(
     option: K,
     value: VisualizationState["debug"][K]
@@ -744,9 +746,10 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
     rotation: [0, 0, 0],
     direction: [0, 0, -1],
   },
+  xrMode: false,
   debug: {
     showAxes: false,
-    showGrid: false,
+    showGrid: true,
     showLabels: true,
     useOrbitControls: false,
     useOrderedConnections: false,
@@ -778,13 +781,17 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
       selectedNode: null,
       cameraSettled: false,
     }),
-  setCameraSettled: (settled) => set({ cameraSettled: settled }),
+  setCameraSettled: (settled) =>
+    set((state) =>
+      state.cameraSettled === settled ? state : { cameraSettled: settled }
+    ),
   setCameraTelemetry: (telemetry) =>
     set((state) =>
       hasTelemetryChanged(state.cameraTelemetry, telemetry)
         ? { cameraTelemetry: telemetry }
         : state
     ),
+  setXRMode: (value) => set({ xrMode: value }),
   setDebugOption: (option, value) =>
     set((state) => ({
       debug: {
@@ -859,11 +866,6 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
 
       const aggregated = aggregateClusters([personalizedCluster]);
 
-      const companyNodeId = createCompanyNodeId(
-        personalizedCluster.id,
-        empresa
-      );
-
       return {
         clusters: [personalizedCluster],
         clusterIndex: aggregated.clusterIndex,
@@ -872,7 +874,8 @@ export const useVisualizationStore = create<VisualizationState>((set) => ({
         connections: aggregated.connections,
         naturalConnections: aggregated.naturalConnections,
         synergyPositions: aggregated.synergyPositions,
-        selectedNode: companyNodeId,
+        selectedNode: null,
+        hasInteracted: true,
       };
     }),
 }));

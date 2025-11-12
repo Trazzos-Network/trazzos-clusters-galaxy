@@ -26,7 +26,6 @@ function PlaneShadowLight({
   size: number;
 }) {
   const lightRef = useRef<THREE.DirectionalLight>(null);
-  const target = useMemo(() => new THREE.Object3D(), []);
   const [x, y, z] = position;
 
   useEffect(() => {
@@ -35,10 +34,8 @@ function PlaneShadowLight({
       return;
     }
 
-    light.target = target;
-
-    target.position.set(x, y, z);
-    target.updateMatrixWorld();
+    light.target.position.set(x, y, z);
+    light.target.updateMatrixWorld();
 
     const camera = light.shadow.camera as THREE.OrthographicCamera;
     const halfSize = size / 2;
@@ -50,7 +47,7 @@ function PlaneShadowLight({
     camera.near = 0.4;
     camera.far = SHADOW_HEIGHT + size * 1.4;
     camera.updateProjectionMatrix();
-  }, [size, target, x, y, z]);
+  }, [size, x, y, z]);
 
   useEffect(() => {
     const light = lightRef.current;
@@ -73,7 +70,6 @@ function PlaneShadowLight({
         shadow-bias={-0.00008}
         shadow-normalBias={0.01}
       />
-      <primitive object={target} />
     </group>
   );
 }

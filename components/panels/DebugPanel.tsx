@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import * as THREE from "three";
 import {
   useVisualizationStore,
@@ -41,6 +41,7 @@ const DEBUG_OPTIONS: Array<{
 ];
 
 export default function DebugPanel() {
+  const [isVisible, setIsVisible] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const debug = useVisualizationStore((state) => state.debug);
   const setDebugOption = useVisualizationStore((state) => state.setDebugOption);
@@ -52,6 +53,78 @@ export default function DebugPanel() {
   const setConnectionMode = useVisualizationStore(
     (state) => state.setConnectionMode
   );
+  const xrMode = useVisualizationStore((state) => state.xrMode);
+  const setXRMode = useVisualizationStore((state) => state.setXRMode);
+  const [xrSupport, setXrSupport] = useState<null | boolean>(null);
+  const [xrError, setXrError] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key.toLowerCase() !== "t") return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
+      setIsVisible((prev) => {
+        const next = !prev;
+        if (next) {
+          setIsOpen(true);
+        }
+        return next;
+      });
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function checkXRSupport() {
+      if (typeof navigator === "undefined" || !("xr" in navigator)) {
+        if (!cancelled) {
+          setXrSupport(false);
+          setXrError("navigator.xr not available");
+        }
+        return;
+      }
+
+      const system = navigator.xr as XRSystem;
+      if (typeof system.isSessionSupported === "function") {
+        const supported = await system
+          .isSessionSupported("immersive-ar")
+          .catch((error) => {
+            if (!cancelled) {
+              setXrError(error?.message ?? "isSessionSupported failed");
+            }
+            return false;
+          });
+        if (!cancelled) {
+          setXrSupport(supported);
+          setXrError(supported ? null : "immersive-ar not supported");
+        }
+        return;
+      }
+
+      if (!cancelled) {
+        setXrSupport(true);
+        setXrError(null);
+      }
+    }
+
+    checkXRSupport();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const cameraTelemetry = useVisualizationStore(
     (state) => state.cameraTelemetry
   );
@@ -79,6 +152,10 @@ export default function DebugPanel() {
     };
   }, [cameraTelemetry]);
 
+  if (!isVisible) {
+    return null;
+  }
+
   return (
     <div className="z-100 w-72 overflow-hidden rounded-lg border border-white/10 bg-[#0f0f0f]/90 shadow-lg backdrop-blur">
       <button
@@ -105,7 +182,7 @@ export default function DebugPanel() {
 
       <div
         className={`space-y-3 border-t border-white/10 px-3 pb-4 transition-[max-height,opacity] duration-300 ease-in-out ${
-          isOpen ? "max-h-[520px] opacity-100" : "max-h-0 opacity-0"
+          isOpen ? "max-h-fit opacity-100" : "max-h-0 opacity-0"
         }`}
       >
         <div className="space-y-2 rounded-md border border-white/10 p-3 text-xs text-white/70">
@@ -126,6 +203,35 @@ export default function DebugPanel() {
               {cameraInfo.direction.y} · z {cameraInfo.direction.z}
             </p>
           </div>
+        </div>
+
+        <div className="space-y-2 rounded-md border border-white/10 p-2 text-xs text-white/70">
+          <p className="text-[10px] uppercase tracking-[0.28em] text-white/45">
+            XR / AR
+          </p>
+          <label className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={xrMode}
+              onChange={(event) => setXRMode(event.target.checked)}
+              disabled={xrSupport !== true}
+              className="accent-[#9aff8d]"
+            />
+            <span>
+              Activar modo AR
+              {xrSupport === null && " · comprobando compatibilidad"}
+              {xrSupport === false && " · no soportado en este dispositivo"}
+              {xrSupport === false && xrError && (
+                <span className="block text-[10px] text-white/30">
+                  {xrError}
+                </span>
+              )}
+            </span>
+          </label>
+          <p className="text-[11px] text-white/40">
+            Renderiza el clúster sobre superficies reales usando WebXR plane-
+            detection.
+          </p>
         </div>
 
         <div className="space-y-2 rounded-md border border-white/10 p-2">

@@ -38,6 +38,7 @@ function Stars({ count = 2500, radius = 280 }: StarsProps) {
       <Points positions={positions} stride={3} frustumCulled>
         <PointMaterial
           transparent
+          opacity={0.5}
           color="#d0d9e3"
           size={0.7}
           sizeAttenuation
@@ -53,6 +54,7 @@ function Stars({ count = 2500, radius = 280 }: StarsProps) {
       >
         <PointMaterial
           transparent
+          opacity={0.5}
           color="#8b9cb0"
           size={0.45}
           sizeAttenuation

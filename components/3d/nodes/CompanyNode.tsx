@@ -72,6 +72,7 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
   const orbitEnabled = useVisualizationStore(
     (state) => state.debug.useOrbitControls
   );
+  const hasInteracted = useVisualizationStore((state) => state.hasInteracted);
   const sinergias = useVisualizationStore(
     (state) => state.clusterIndex[company.clusterId]?.sinergias ?? []
   );
@@ -232,9 +233,9 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
   const labelPosition = useMemo(
     () =>
       [
-        0,
+        -4,
         baseDimensions.height / 2 + 0.35,
-        baseDimensions.depth * 0.8 + 0.6,
+        baseDimensions.depth * 0.68 + 0.6,
       ] as [number, number, number],
     [baseDimensions.depth, baseDimensions.height]
   );
@@ -298,6 +299,7 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     if (!isFocus) return;
     if (isSelected) return;
     if (connectionMode !== "focus") return;
+    if (hasInteracted) return;
 
     setSelectedNode(company.nodeId);
     setConnectionMode("focus");
@@ -307,6 +309,7 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
     isMyCompany,
     isSelected,
     connectionMode,
+    hasInteracted,
     setConnectionMode,
     setSelectedNode,
   ]);
@@ -509,6 +512,8 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
             color="#f5f8f2"
             metalness={0.08}
             roughness={0.35}
+            emissive="#f5f8f2"
+            emissiveIntensity={0.5}
             toneMapped={false}
           />
         </mesh>
@@ -584,7 +589,7 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
         })}
       </animated.group>
 
-      {showLabels && (
+      {showLabels && !isFocus && (
         <Html position={labelPosition} center pointerEvents="none">
           <div className="px-3 py-1 rounded-md border border-white/10 bg-card/65 text-[11px] font-medium text-white whitespace-nowrap shadow-lg">
             {company.empresa}
@@ -592,22 +597,22 @@ export default function CompanyNode({ company }: CompanyNodeProps) {
         </Html>
       )}
 
-      {showSavingsCard && (
+      {showSavingsCard && selectedNode === company.nodeId && (
         <Html
-          position={[0, modelTopHeight, 0]}
+          position={[-6, modelTopHeight * 2, -8]}
           center
           transform
           sprite
           distanceFactor={10}
         >
-          <div className="rounded-2xl max-w-[200px] border border-primary bg-card/65 px-6 py-4 text-center text-white shadow-[0_28px_55px_-25px_rgba(0,0,0,0.9)] backdrop-blur-lg">
-            <p className="text-xs uppercase tracking-[0.36em] text-white/50">
+          <div className="rounded-2xl max-w-fit border border-border bg-card/65 px-6 py-4 text-center text-white shadow-[0_28px_55px_-25px_rgba(0,0,0,0.9)] backdrop-blur-lg">
+            <p className="text-2xl mx-auto uppercase tracking-[0.36em] text-white/50">
               Potencial de ahorro
             </p>
-            <p className="text-2xl font-semibold text-[#cbffc4]">
+            <p className="text-6xl mt-2 font-semibold text-[#cbffc4]">
               {formattedSavings}
             </p>
-            <p className="text-sm text-white/60">
+            <p className="text-3xl text-white/60 mt-2">
               {relatedSynergies.length} sinergia
               {relatedSynergies.length === 1 ? "" : "s"} activas
             </p>

@@ -33,7 +33,7 @@ export default function ClusterLabels() {
           center
           pointerEvents="none"
         >
-          <div className="px-4 py-2 rounded-lg border border-white/15 bg-[#101010]/90 text-sm font-semibold text-primary shadow-2xl whitespace-nowrap">
+          <div className="px-4 py-2 rounded-lg border border-border bg-card/75 text-sm font-semibold text-[#cbffc4] shadow-2xl whitespace-nowrap">
             {label.text}
           </div>
         </Html>

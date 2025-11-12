@@ -21,8 +21,8 @@ export default function MapPlane({
   position = [0, -0.6, 0],
   size = MAP_PLANE_DEFAULT_SIZE,
   thickness = MAP_PLANE_DEFAULT_THICKNESS,
-  cornerRadius = 1,
-  cornerSegments = 6,
+  cornerRadius = 8,
+  cornerSegments = 16,
 }: MapPlaneProps) {
   const getCssVariable = (name: string, fallback: string) => {
     if (typeof window === "undefined") return fallback;
@@ -68,6 +68,7 @@ export default function MapPlane({
     tex.repeat.set(25, 25);
     tex.anisotropy = 8;
     tex.needsUpdate = true;
+
     return tex;
   }, []);
 
@@ -110,6 +111,8 @@ export default function MapPlane({
       map: texture ?? undefined,
       roughness: 0.92,
       metalness: 0.03,
+      opacity: 0.25,
+      transparent: true,
       side: THREE.DoubleSide,
     });
 
@@ -117,6 +120,8 @@ export default function MapPlane({
       color: sideColor,
       roughness: 0.92,
       metalness: 0.03,
+      emissive: "#74b600",
+      emissiveIntensity: 3.6,
     });
 
     return [side, side, topBottom, topBottom, side, side];
